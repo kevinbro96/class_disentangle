@@ -224,11 +224,30 @@ def main(args):
             print('\n=> Begin to Validation Epoch #%d' % (epoch))
             model.eval()
             vae.eval()
-            evaluation_class_dependent.evaluate_against_attacks(model, vae, validation_attacks, testloader, wandb = wandb, num_batches = 100 )
+            evaluation_class_dependent.evaluate_against_attacks(model, vae, validation_attacks, testloader, wandb = wandb, num_batches = 10 )
             reconst_images(epoch=epoch, batch_size=64, batch_num=2, dataloader=testloader, model=vae)
+            checkpoint_fname = os.path.join(args.save_dir, f'{epoch:04d}.ckpt.pth')
+            checkpoint_model = model
+            if isinstance(checkpoint_model, nn.DataParallel):
+                checkpoint_model = checkpoint_model.module
+            checkpoint_vae = vae
+            if isinstance(checkpoint_vae, nn.DataParallel):
+                checkpoint_vae = checkpoint_vae.module
+            state = {
+                'model': checkpoint_model.state_dict(),
+                'vae': checkpoint_vae.state_dict()
+            }
+            torch.save(state, checkpoint_fname)
         epoch_time = time.time() - start_time
         elapsed_time += epoch_time
         print('| Elapsed time : %d:%02d:%02d' % (get_hms(elapsed_time)))
+
+    print('\n=> Begin to Validation Epoch #%d' % (epoch))
+    model.eval()
+    vae.eval()
+    evaluation_class_dependent.evaluate_against_attacks(model, vae, validation_attacks, testloader, wandb=wandb,
+                                                        num_batches=10)
+    reconst_images(epoch=epoch, batch_size=64, batch_num=2, dataloader=testloader, model=vae)
 
     wandb.finish()
     print('\n[Phase 4] : Testing model')

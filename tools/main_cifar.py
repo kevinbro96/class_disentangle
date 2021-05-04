@@ -79,19 +79,18 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
         vae.eval()
         adv_inputs = attack(inputs, labels)
 
-        model.train()
         vae.train()
         optimizer.zero_grad()
         mu, logvar, xi = vae(inputs)
         adv_mu, adv_logvar, adv_xi = vae(adv_inputs)
 
-        out = model(torch.cat((normalize(xi), normalize(inputs)-normalize(xi)), dim=0))
-        out1 = out[0:inputs.size(0)]
-        out2 = out[inputs.size(0):]
+        out1 = model(normalize(xi))
+        adv_out1 = model(normalize(adv_xi))
 
-        adv_out = model(torch.cat((normalize(adv_xi), normalize(adv_inputs)-normalize(adv_xi)), dim=0))
-        adv_out1 = adv_out[0:inputs.size(0)]
-        adv_out2 = adv_out[inputs.size(0):]
+        model.train()
+
+        out2 = model(normalize(inputs)-normalize(xi))
+        adv_out2 = model(normalize(adv_inputs)-normalize(adv_xi))
 
         if epoch < 100:
             re = args.re[0]

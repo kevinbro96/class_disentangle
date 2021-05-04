@@ -189,12 +189,12 @@ class CVAE_cifar(AbstractAutoEncoder):
         return h, self.fc11(h1), self.fc12(h1)
 
     def reparameterize(self, mu, logvar):
-        if self.training:
+        #if self.training:
             std = logvar.mul(0.5).exp_()
             eps = std.new(std.size()).normal_()
             return eps.mul(std).add_(mu)
-        else:
-            return mu
+        #else:
+        #    return mu
 
     def decode(self, z):
         z = z.view(-1, self.d, self.f, self.f)

@@ -77,6 +77,7 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
         bs = inputs.size(0)
         model.eval()
         vae.eval()
+        model_state_dict = copy.deepcopy(model.state_dict())
         adv_inputs = attack(inputs, labels)
 
         vae.train()
@@ -91,7 +92,13 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
 
         out2 = model(normalize(inputs)-normalize(xi))
         adv_out2 = model(normalize(adv_inputs)-normalize(adv_xi))
-
+        new_model_state_dict = copy.deepcopy(model.state_dict())
+        for key in model_state_dict:
+            old_tensor = model_state_dict[key]
+            new_tensor = new_model_state_dict[key]
+            max_diff = (old_tensor - new_tensor).abs().max().item()
+            if max_diff > 1e-8:
+                print(f'max difference for {key} = {max_diff}')
         if epoch < 100:
             re = args.re[0]
         elif epoch < 200:

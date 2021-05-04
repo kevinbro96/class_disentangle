@@ -61,9 +61,6 @@ def reconst_images(epoch=2, batch_size=64, batch_num=2, dataloader=None, model=N
     print("\nreconstruction complete!\t\tAcc: %.4f " % (acc_avg.avg))
 
 def train(args, epoch, model, vae, optimizer, trainloader, attack):
-    model.train()
-    model.training = True
-    vae.train()
 
     loss_avg = AverageMeter()
     loss_rec = AverageMeter()
@@ -78,9 +75,13 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
         inputs, labels = inputs.cuda(), labels.cuda().view(-1, )
         inputs, labels = Variable(inputs), Variable(labels)
         bs = inputs.size(0)
-        optimizer.zero_grad()
+        model.eval()
+        vae.eval()
         adv_inputs = attack(inputs, labels)
 
+        model.train()
+        vae.train()
+        optimizer.zero_grad()
         mu, logvar, xi = vae(inputs)
         adv_mu, adv_logvar, adv_xi = vae(adv_inputs)
 

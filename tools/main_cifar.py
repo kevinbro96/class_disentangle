@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 from tqdm import tqdm
+import copy
 from copy import deepcopy
 import torchvision
 import torchvision.transforms as transforms
@@ -74,31 +75,28 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
     for batch_idx, (inputs, labels) in enumerate(trainloader):
         inputs, labels = inputs.cuda(), labels.cuda().view(-1, )
         inputs, labels = Variable(inputs), Variable(labels)
-        bs = inputs.size(0)
+
         model.eval()
         vae.eval()
-        model_state_dict = copy.deepcopy(model.state_dict())
         adv_inputs = attack(inputs, labels)
 
         vae.train()
         optimizer.zero_grad()
-        mu, logvar, xi = vae(inputs)
-        adv_mu, adv_logvar, adv_xi = vae(adv_inputs)
+
+        all_inputs = torch.cat((inputs, adv_inputs))
+        bs = all_inputs.size(0)
+        mu, logvar, xi = vae(all_inputs)
 
         out1 = model(normalize(xi))
-        adv_out1 = model(normalize(adv_xi))
 
         model.train()
+        out2 = model(normalize(all_inputs) - normalize(xi))
 
-        out2 = model(normalize(inputs)-normalize(xi))
-        adv_out2 = model(normalize(adv_inputs)-normalize(adv_xi))
-        new_model_state_dict = copy.deepcopy(model.state_dict())
-        for key in model_state_dict:
-            old_tensor = model_state_dict[key]
-            new_tensor = new_model_state_dict[key]
-            max_diff = (old_tensor - new_tensor).abs().max().item()
-            if max_diff > 1e-8:
-                print(f'max difference for {key} = {max_diff}')
+        # model_state_dict = copy.deepcopy(model.state_dict())
+        # # for key in model_state_dict:
+        # #     if 'bn' in key:
+        # #         old_tensor = model_state_dict[key]
+        # #         print(f' {key} : {old_tensor}')
         if epoch < 100:
             re = args.re[0]
         elif epoch < 200:
@@ -106,29 +104,26 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
         else:
             re = args.re[2]
 
-        l1 = F.mse_loss(normalize(xi), normalize(inputs)) \
-            + F.mse_loss(normalize(adv_xi), normalize(adv_inputs)) \
-            + F.mse_loss(normalize(adv_inputs) - normalize(inputs)+normalize(xi), normalize(adv_xi))
-        entropy = (F.softmax(out1, dim=1) * F.log_softmax(out1, dim=1)).sum(dim=1).mean() \
-                + (F.softmax(adv_out1, dim=1) * F.log_softmax(adv_out1, dim=1)).sum(dim=1).mean()
-        cross_entropy = F.cross_entropy(out2, labels) + F.cross_entropy(adv_out2, labels)
+        l1 = F.mse_loss(normalize(xi), normalize(all_inputs)) \
+            + F.mse_loss(normalize(adv_inputs) - normalize(inputs)+normalize(xi[0:inputs.size(0)]), normalize(xi[inputs.size(0):]))
+        entropy = (F.softmax(out1, dim=1) * F.log_softmax(out1, dim=1)).sum(dim=1).mean()
+        cross_entropy = F.cross_entropy(out2, torch.cat((labels, labels)))
         l2 = cross_entropy + entropy
-        l3 = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())\
-            -0.5 * torch.sum(1 + adv_logvar - adv_mu.pow(2) - adv_logvar.exp())
+        l3 = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         l3 /= bs * 3 * args.dim
         loss = re * l1 + args.ce * l2 + args.kl * l3
         loss.backward()
         optimizer.step()
 
-        prec1, prec5, correct, pred = accuracy(out2.data, labels.data, topk=(1, 5))
-        prec1_adv, prec5, correct, pred = accuracy(adv_out2.data, labels.data, topk=(1, 5))
+        prec1, prec5, correct, pred = accuracy(out2[0:inputs.size(0)].data, labels.data, topk=(1, 5))
+        prec1_adv, prec5, correct, pred = accuracy(out2[0:inputs.size(0)].data, labels.data, topk=(1, 5))
         loss_avg.update(loss.data.item(), bs)
         loss_rec.update(l1.data.item(), bs)
         loss_ce.update(cross_entropy.data.item(), bs)
         loss_entropy.update(entropy.data.item(), bs)
         loss_kl.update(l3.data.item(), bs)
-        top1.update(prec1.item(), bs)
-        adv_top1.update(prec1_adv.item(), bs)
+        top1.update(prec1.item(), bs/2)
+        adv_top1.update(prec1_adv.item(), bs/2)
 
         n_iter = (epoch - 1) * len(trainloader) + batch_idx
         wandb.log({'loss': loss_avg.avg, \
@@ -189,7 +184,7 @@ def main(args):
     print('\n[Phase 2] : Model setup')
     vae = CVAE_cifar(d=feature_dim, z=CNN_embed_dim)
     #model = resnet50(pretrained=False)
-    model = Wide_ResNet(28, 10, 0.3, 10)
+    model = Wide_ResNet(28, 10, 0.3, 10, args.mom)
     if use_cuda:
         model.cuda()
         model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
@@ -279,6 +274,7 @@ if __name__ == '__main__':
     parser.add_argument('--step', nargs='+', type=int)
     parser.add_argument('--kl', default=1.0, type=float, help='kl weight')
     parser.add_argument('--ce', default=1.0, type=float, help='cross entropy weight')
+    parser.add_argument('--mom', default=0.1, type=float, help='bn momentum')
     args = parser.parse_args()
     wandb.init(config=args, name=args.save_dir.replace("results/", ''))
     set_random_seed(args.seed)

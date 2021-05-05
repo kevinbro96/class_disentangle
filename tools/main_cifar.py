@@ -116,7 +116,7 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
         optimizer.step()
 
         prec1, prec5, correct, pred = accuracy(out2[0:inputs.size(0)].data, labels.data, topk=(1, 5))
-        prec1_adv, prec5, correct, pred = accuracy(out2[0:inputs.size(0)].data, labels.data, topk=(1, 5))
+        prec1_adv, prec5, correct, pred = accuracy(out2[inputs.size(0):].data, labels.data, topk=(1, 5))
         loss_avg.update(loss.data.item(), bs)
         loss_rec.update(l1.data.item(), bs)
         loss_ce.update(cross_entropy.data.item(), bs)

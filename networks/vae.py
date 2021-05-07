@@ -171,11 +171,9 @@ class CVAE_cifar(AbstractAutoEncoder):
             nn.BatchNorm2d(d // 2),
             nn.LeakyReLU(inplace=True),
             nn.ConvTranspose2d(d // 2, 3, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.Sigmoid()
         )
 
-        self.xi_bn = nn.BatchNorm2d(3)
-        self.normalize = CIFARNORMALIZE(32)
-        self.innormalize = CIFARINNORMALIZE(32)
         self.f = 8
         self.d = d
         self.z = z
@@ -199,16 +197,13 @@ class CVAE_cifar(AbstractAutoEncoder):
     def decode(self, z):
         z = z.view(-1, self.d, self.f, self.f)
         h3 = self.decoder(z)
-        return torch.tanh(h3)
+        return h3
 
     def forward(self, x):
-        x = self.normalize(x)
         _, mu, logvar = self.encode(x)
         hi = self.reparameterize(mu, logvar)
         hi_projected = self.fc21(hi)
         xi = self.decode(hi_projected)
-        xi = self.xi_bn(xi)
-        xi = self.innormalize(xi)
 
         return mu, logvar, xi
 

@@ -105,7 +105,7 @@ def train(args, epoch, model, vae, optimizer, trainloader, attack):
             re = args.re[2]
 
         l1 = F.mse_loss(normalize(xi), normalize(all_inputs)) \
-            + F.mse_loss(normalize(adv_inputs) - normalize(inputs)+normalize(xi[0:inputs.size(0)]), normalize(xi[inputs.size(0):]))
+            + 10 * F.mse_loss(normalize(adv_inputs) - normalize(inputs)+normalize(xi[0:inputs.size(0)]), normalize(xi[inputs.size(0):]))
         entropy = (F.softmax(out1, dim=1) * F.log_softmax(out1, dim=1)).sum(dim=1).mean()
         cross_entropy = F.cross_entropy(out2, torch.cat((labels, labels)))
         l2 = cross_entropy + entropy
@@ -258,7 +258,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch CIFAR-10 Training')
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--attack', type=str, default='DeltaAttack(model, vae, num_iterations=10,eps_max=8 / 255)')
+    parser.add_argument('--attack', type=str, default='DeltaAttack(model, vae, num_iterations=10, eps_max=8 / 255)')
     parser.add_argument('--lr', default=0.1, type=float, help='learning_rate')
     parser.add_argument('--save_dir', default='./results/autoaug_new_8_0.5/', type=str, help='save_dir')
     parser.add_argument('--seed', default=666, type=int, help='seed')

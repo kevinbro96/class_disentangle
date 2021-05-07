@@ -63,7 +63,7 @@ def reconst_images(epoch=2, batch_size=64, batch_num=2, dataloader=None, model=N
                 wandb.log({'acc': acc_avg.avg}, commit=False)
     print("\nreconstruction complete!\t\tAcc: %.4f " % (acc_avg.avg))
 
-def train(args, epoch, model, vae, optimizer, trainloader, attack):
+def train(args, epoch, model, vae, optimizer, trainloader):
     vae.train()
     model.train()
 
@@ -214,7 +214,7 @@ def main(args):
     elapsed_time = 0
     for epoch in range(start_epoch, start_epoch + args.epochs):
         start_time = time.time()
-        train(args, epoch, model, vae, optimizer, trainloader, attack)
+        train(args, epoch, model, vae, optimizer, trainloader)
         scheduler.step()
         if epoch % 10 == 1:
             print('\n=> Begin to Validation Epoch #%d' % (epoch))

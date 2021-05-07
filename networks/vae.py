@@ -55,7 +55,7 @@ class wide_basic(nn.Module):
         return out
 
 class Wide_ResNet(nn.Module):
-    def __init__(self, depth, widen_factor, dropout_rate, num_classes, momentum):
+    def __init__(self, depth, widen_factor, dropout_rate, num_classes, momentum=0.1):
         super(Wide_ResNet, self).__init__()
         self.in_planes = 16
 
@@ -166,7 +166,6 @@ class CVAE_cifar(AbstractAutoEncoder):
             nn.BatchNorm2d(d),
             ResBlock(d, d, bn=True),
             nn.BatchNorm2d(d),
-
             nn.ConvTranspose2d(d, d // 2, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(d // 2),
             nn.LeakyReLU(inplace=True),
@@ -204,6 +203,7 @@ class CVAE_cifar(AbstractAutoEncoder):
         hi = self.reparameterize(mu, logvar)
         hi_projected = self.fc21(hi)
         xi = self.decode(hi_projected)
+        xi = torch.clamp(xi - x, max=0) + x
 
         return mu, logvar, xi
 
